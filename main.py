@@ -2,57 +2,11 @@ import numpy as np
 import pandas as pd
 import cv2
 
-class Lidar():
-
-    def __init__(self, map, angle, min_dist, max_dist, pix_size, num_points=360) -> None:
-        self.map = map
-        self.angle = angle
-        self.min_dist = min_dist
-        self.max_dist = max_dist
-        self.scale = pix_size
-        self.num_points = num_points
-
-        self.accuracy = 1000
-
-    def scan(self, point, map, rot=0):
-        
-        scan_angle = self.angle / self.num_points
-        offset_angle = (((np.pi * 2) / scan_angle) - self.num_points) / 2
-
-        for i in range(self.num_points):
-            x = np.round(np.sin((scan_angle * (i + offset_angle)) + rot) * self.max_dist * self.scale[0]).astype(np.int64) + point[0]
-            y = np.round(np.cos((scan_angle * (i + offset_angle)) + rot) * self.max_dist * self.scale[1]).astype(np.int64) + point[1]
-
-            lin_x = np.linspace(point[0], x, self.accuracy)
-            lin_y = np.linspace(point[1], y, self.accuracy)
-
-            # if i == 220:
-            #     for l_x, l_y in zip(lin_x, lin_y):
-            #         if l_x < self.map.shape[1] and l_y < self.map.shape[0]:
-            #             if self.map[l_y, l_x, 0] < 255:
-            #                 map = cv2.rectangle(map, (l_x - 1, l_y - 1), (l_x + 1, l_y + 1), (0, 0, 255), -1)
-            #                 x = l_x
-            #                 y = l_y
-
-            #                 break
-            #             else:
-            #                 map = cv2.rectangle(map, (l_x - 1, l_y - 1), (l_x + 1, l_y + 1), (0, 255, 0), -1)
-
-            for l_x, l_y in zip(lin_x, lin_y):
-                l_x = np.floor(l_x).astype(np.int64)
-                l_y = np.floor(l_y).astype(np.int64)
-                if l_x < self.map.shape[1] and l_y < self.map.shape[0]:
-                    if self.map[l_y, l_x, 0] < 255:
-                        x = l_x
-                        y = l_y
-
-                        break
-
-            size = 1
-            map = cv2.rectangle(map, (x - size, y - size), (x + size, y + size), (0, 0, 255), -1)
-        return map
+from lidar import Lidar
 
 if __name__ == '__main__':
+
+    # Load map file
     map = cv2.imread('/home/mikolaj/autoware_map/race_track_01/map.pgm')
     h, w, c = map.shape
     scale = 3
@@ -60,16 +14,18 @@ if __name__ == '__main__':
     _, map = cv2.threshold(map, 250, 255, cv2.THRESH_BINARY)
     map_oryg = np.copy(map)
     
+    # Load reference trajectory
     ref_traj = pd.read_csv('/home/mikolaj/autoware_map/race_track_01/trajectory.csv', sep='; ')
     ref_traj = ref_traj[['x_m', 'y_m']]
 
+    # Offset variables to match reference trajectory with map
     offset = (190 * scale, 255 * scale)
     pix_size = (20.5 * scale, 20.5 * scale)
 
     ref_traj['x_px'] = np.round((ref_traj['x_m'] * pix_size[0]) + offset[0], decimals=0).astype(np.int64)
     ref_traj['y_px'] = np.round((ref_traj['y_m'] * pix_size[0] * -1) + offset[1], decimals=0).astype(np.int64)
 
-    # Start point
+    # Start conditions
     start_point = np.array([250 * scale, 255 * scale])
     start_angle = -np.pi / 2
     step = 0.1
@@ -91,25 +47,79 @@ if __name__ == '__main__':
         cv2.line(map, start_point, ((start_point[0] + (start_direction[0] * 6)).astype(np.int64),  (start_point[1] - (start_direction[1] * 6)).astype(np.int64)), (255, 0, 0), 3)
 
         # Create lidar
-        lid = Lidar(map_oryg, np.pi * 1.5, 0, 5, pix_size)
-        map = lid.scan(start_point, map, rot=start_angle)
+        view_angle = np.pi * 1.5
+        num_points = 360
+        min_dist = 0
+        max_dist = 5
+        lid = Lidar(map_oryg, view_angle, min_dist, max_dist, pix_size, num_points=num_points)
+        map, distances = lid.scan(start_point, map, rot=start_angle)
+        
+        scan_angle = view_angle / num_points
+        offset_angle = (((np.pi * 2) / scan_angle) - num_points) / 2
+
+        # Convert lidar distances to x, y coordinates
+        coords = []
+        for i, dist in enumerate(distances):
+            if dist < max_dist - 0.05:
+                x = (np.sin((scan_angle * (i + offset_angle)) + start_angle) * dist) + (start_point[0] / pix_size[0])
+                y = (np.cos((scan_angle * (i + offset_angle)) + start_angle) * dist) + (start_point[1] / pix_size[1])
+
+                coords.append([x, y])
+                # # Draw points on the map
+                # point_size = 1
+                # map = cv2.rectangle(map, (int(x * pix_size[0]) - point_size, int(y * pix_size[1]) - point_size), (int(x * pix_size[0]) + point_size, int(y * pix_size[1]) + point_size), (0, 255, 0), -1)
+
+        # Create point sections 
+        line_sections = []
+        line_subsection = []
+        threshold = 0.3
+        for i in range(len(coords)):
+            j = i + 1
+
+            if j == len(coords):
+                if len(line_subsection) > 10:
+                    line_sections.append(line_subsection)
+                break
+
+            points_dist = np.hypot(coords[i][0] - coords[j][0], coords[i][0] - coords[j][0])
+            if points_dist < threshold:
+                line_subsection.append((coords[i], points_dist))
+            
+            else:
+                if len(line_subsection) > 10:
+                    line_sections.append(line_subsection)
+                
+                line_subsection = []
+        
+        
+
+        # print(a)
 
         # Visualize map
         cv2.imshow('map', map)
         
         # Calc movement
-        key = cv2.waitKey(50)
-        print(key)
+        key = cv2.waitKey(1)
+
+        # Exit simulation
         if key == ord('q'):
             break
+
+        # Move forward
         if key == ord('w'):
             start_point[0] = start_point[0] + (step * pix_size[0] * start_direction[0])
             start_point[1] = start_point[1] - (step * pix_size[1] * start_direction[1])
+
+        # Move backward
         if key == ord('s'):
             start_point[0] = start_point[0] - (step * pix_size[0] * start_direction[0])
             start_point[1] = start_point[1] + (step * pix_size[1] * start_direction[1])
+
+        # Turn left
         if key == ord('a'):
             start_angle = start_angle + angle_step
+
+        # Turn right
         if key == ord('d'):
             start_angle = start_angle - angle_step
 
