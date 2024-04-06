@@ -3,6 +3,8 @@ import pandas as pd
 import cv2
 
 from lidar import Lidar
+from bezier import bezier_curve
+
 
 if __name__ == '__main__':
 
@@ -103,14 +105,11 @@ if __name__ == '__main__':
                     distance = 0
                     line_subsection_reduced.append(points)
 
-            if len(line_subsection_reduced) > 0:
+            if len(line_subsection_reduced) > 1:
                 line_subsection_reduced.insert(0, line_sub[0][0])
                 line_sections_reduced.append(line_subsection_reduced)
 
-        # print(line_sections_reduced)
-        # print(a)
-
-        # Draw the lines
+        # Draw sections
         for line_sub_red in line_sections_reduced:
             for i in range(len(line_sub_red) - 1):
                 x1, y1 = line_sub_red[i]
@@ -118,10 +117,70 @@ if __name__ == '__main__':
                 x2, y2 = line_sub_red[i + 1]
                 x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
 
-                # print((x1, y1), (x2, y2))
-
                 cv2.line(map, (x1, y1), (x2, y2), (0, 255, 0), 1)
-                # break
+
+        # Calculate normal vectors
+        distance_from_border = 0.8
+        normal_vectors_sections = []
+        for line_sub_red in line_sections_reduced:
+
+            normal_vectors_subsections = []
+            for i in range(len(line_sub_red) - 1):
+                x1, y1 = line_sub_red[i]
+                x2, y2 = line_sub_red[i + 1]
+
+                n_x, n_y = (y2 - y1), -(x2 - x1)
+                n_x, n_y = n_x / np.linalg.norm((n_x, n_y)) * distance_from_border, n_y / np.linalg.norm((n_x, n_y)) * distance_from_border
+
+                normal_vectors_subsections.append((n_x + x1, n_y + y1))
+
+                # Draw normal vectors
+                x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+                x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+                n_x, n_y = int(n_x * pix_size[0]), int(n_y * pix_size[1])
+                cv2.line(map, (x1, y1), (n_x + x1, n_y + y1), (0, 255, 0), 1)
+
+            normal_vectors_sections.append(normal_vectors_subsections)
+                
+        # Check if normal vectors are intersecting each other and remove them
+        no_inter_sections = []
+        for line_sub_red, norm_sub in zip(line_sections_reduced, normal_vectors_sections):
+            no_inter_subsections = []
+            for i in range(len(norm_sub) - 1):
+                x1, y1 = line_sub_red[i]
+                x2, y2 = norm_sub[i]
+                x3, y3 = line_sub_red[i + 1]
+                x4, y4 = norm_sub[i + 1]
+
+                if ((x1 < x3 and x2 > x4) or (x1 > x3 and x2 < x4)) or ((y1 < y3 and y2 > y4) or (y1 > y3 and y2 < y4)):
+                    pass
+
+                else:
+                    no_inter_subsections.append(norm_sub[i])
+
+            no_inter_subsections.append(norm_sub[-1])
+
+            if len(no_inter_subsections) > 1:
+                no_inter_sections.append(no_inter_subsections)
+
+        # Draw normal vector sections
+        for norm_sub in no_inter_sections:
+            for i in range(len(norm_sub) - 1):
+                x1, y1 = norm_sub[i]
+                x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+                x2, y2 = norm_sub[i + 1]
+                x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+
+                cv2.line(map, (x1, y1), (x2, y2), (0, 165, 255), 1)
+        
+        curve = np.array(bezier_curve(no_inter_sections[0], nTimes=100)).T
+
+        for point in curve:
+            x, y = point
+            x, y = int(x * pix_size[0]), int(y * pix_size[1])
+
+            cv2.rectangle(map, (x, y), (x, y), (255, 0, 255))
+        print(curve)
 
         # print(a)
 
