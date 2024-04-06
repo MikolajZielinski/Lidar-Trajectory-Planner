@@ -81,7 +81,7 @@ if __name__ == '__main__':
                     line_sections.append(line_subsection)
                 break
 
-            points_dist = np.hypot(coords[i][0] - coords[j][0], coords[i][0] - coords[j][0])
+            points_dist = np.hypot(coords[i][0] - coords[j][0], coords[i][1] - coords[j][1])
             if points_dist < threshold:
                 line_subsection.append((coords[i], points_dist))
             
@@ -91,7 +91,37 @@ if __name__ == '__main__':
                 
                 line_subsection = []
         
-        
+        # Reduce number of points on a section
+        line_sections_reduced = []
+        for line_sub in line_sections:
+            distance = 0
+            line_subsection_reduced = []
+            for points, dist in line_sub:
+                distance += dist
+
+                if distance >= 0.3:
+                    distance = 0
+                    line_subsection_reduced.append(points)
+
+            if len(line_subsection_reduced) > 0:
+                line_subsection_reduced.insert(0, line_sub[0][0])
+                line_sections_reduced.append(line_subsection_reduced)
+
+        # print(line_sections_reduced)
+        # print(a)
+
+        # Draw the lines
+        for line_sub_red in line_sections_reduced:
+            for i in range(len(line_sub_red) - 1):
+                x1, y1 = line_sub_red[i]
+                x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+                x2, y2 = line_sub_red[i + 1]
+                x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+
+                # print((x1, y1), (x2, y2))
+
+                cv2.line(map, (x1, y1), (x2, y2), (0, 255, 0), 1)
+                # break
 
         # print(a)
 
