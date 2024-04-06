@@ -29,7 +29,7 @@ def bezier_curve(points, nTimes=1000):
 
     t = np.linspace(0.0, 1.0, nTimes)
 
-    polynomial_array = np.array([ bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)   ])
+    polynomial_array = np.array([bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)])
 
     xvals = np.dot(xPoints, polynomial_array)
     yvals = np.dot(yPoints, polynomial_array)

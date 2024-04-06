@@ -164,23 +164,64 @@ if __name__ == '__main__':
                 no_inter_sections.append(no_inter_subsections)
 
         # Draw normal vector sections
-        for norm_sub in no_inter_sections:
-            for i in range(len(norm_sub) - 1):
-                x1, y1 = norm_sub[i]
+        for no_inter_sub in no_inter_sections:
+            for i in range(len(no_inter_sub) - 1):
+                x1, y1 = no_inter_sub[i]
                 x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
-                x2, y2 = norm_sub[i + 1]
+                x2, y2 = no_inter_sub[i + 1]
                 x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
 
                 cv2.line(map, (x1, y1), (x2, y2), (0, 165, 255), 1)
-        
-        curve = np.array(bezier_curve(no_inter_sections[0], nTimes=100)).T
+
+        # Join line sections
+        joined_sections = []
+        if len(no_inter_sections) > 1:
+            x1, y1 = no_inter_sections[1][0]
+            smallest_dist = np.inf
+            smallest_idx = len(no_inter_sections[0])
+            for j, point in enumerate(no_inter_sections[0]):
+                x2, y2 = point
+                dist = np.hypot(x1 - x2, y1 - y2)
+
+                if dist < smallest_dist:
+                    smallest_dist = dist
+
+                    if smallest_idx == 0:
+                        smallest_idx = 1
+                    else:
+                        smallest_idx = j
+
+            # Check if path to joins is not going back
+            x1, y1 = no_inter_sections[0][smallest_idx]
+            x2, y2 = no_inter_sections[0][0]
+            x3, y3 = no_inter_sections[1][0]
+            x4, y4 = no_inter_sections[1][-1]
+
+            # cv2.line(map, (int(x1 * pix_size[0]), int(y1 * pix_size[1])), (int(x2 * pix_size[0]), int(y2 * pix_size[1])), (0, 0, 255))
+            # cv2.line(map, (int(x3 * pix_size[0]), int(y3 * pix_size[1])), (int(x4 * pix_size[0]), int(y4 * pix_size[1])), (0, 0, 255))
+
+            d12 = np.array([x2 - x1, y2 - y1])
+            d12 = d12 / np.linalg.norm(d12)
+            d34 = np.array([x3 - x4, y3 - y4])
+            d34 = d34 / np.linalg.norm(d34)
+
+            angle = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
+
+            if angle < 140:
+                joined_sections.extend(no_inter_sections[0][:smallest_idx])
+                joined_sections.extend(no_inter_sections[1])
+
+            else:
+                joined_sections.extend(no_inter_sections[0])
+
+        # Smooth trajectory with Bezu curve
+        curve = np.array(bezier_curve(joined_sections, nTimes=100)).T
 
         for point in curve:
             x, y = point
             x, y = int(x * pix_size[0]), int(y * pix_size[1])
 
             cv2.rectangle(map, (x, y), (x, y), (255, 0, 255))
-        print(curve)
 
         # print(a)
 
