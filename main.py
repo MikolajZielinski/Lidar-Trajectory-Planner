@@ -173,49 +173,131 @@ if __name__ == '__main__':
 
                 cv2.line(map, (x1, y1), (x2, y2), (0, 165, 255), 1)
 
-        # Join line sections
-        joined_sections = []
-        if len(no_inter_sections) > 1:
-            x1, y1 = no_inter_sections[1][0]
-            smallest_dist = np.inf
-            smallest_idx = len(no_inter_sections[0])
-            for j, point in enumerate(no_inter_sections[0]):
-                x2, y2 = point
-                dist = np.hypot(x1 - x2, y1 - y2)
-
-                if dist < smallest_dist:
-                    smallest_dist = dist
-
-                    if smallest_idx == 0:
-                        smallest_idx = 1
-                    else:
-                        smallest_idx = j
-
-            # Check if path to joins is not going back
-            x1, y1 = no_inter_sections[0][smallest_idx]
-            x2, y2 = no_inter_sections[0][0]
-            x3, y3 = no_inter_sections[1][0]
-            x4, y4 = no_inter_sections[1][-1]
-
-            # cv2.line(map, (int(x1 * pix_size[0]), int(y1 * pix_size[1])), (int(x2 * pix_size[0]), int(y2 * pix_size[1])), (0, 0, 255))
-            # cv2.line(map, (int(x3 * pix_size[0]), int(y3 * pix_size[1])), (int(x4 * pix_size[0]), int(y4 * pix_size[1])), (0, 0, 255))
-
-            d12 = np.array([x2 - x1, y2 - y1])
+        # Connect edges
+        x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
+        perimeter_points = []
+        for i, no_inter_sub in enumerate(no_inter_sections):
+            x1, y1 = no_inter_sub[0]
+            x2, y2 = no_inter_sub[-1]
+            xd, yd = start_direction
+            xd, yd = xd, -yd
+            
+            d12 = np.array([xd, yd])
             d12 = d12 / np.linalg.norm(d12)
-            d34 = np.array([x3 - x4, y3 - y4])
+            d34 = np.array([x1 - x0, y1 - y0])
             d34 = d34 / np.linalg.norm(d34)
+            d56 = np.array([x2 - x0, y2 - y0])
+            d56 = d56 / np.linalg.norm(d56)
 
-            angle = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
+            # Add points only in front ot the vehicle
+            angle1 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
+            angle2 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d56), -1.0, 1.0)))
 
-            if angle < 140:
-                joined_sections.extend(no_inter_sections[0][:smallest_idx])
-                joined_sections.extend(no_inter_sections[1])
+            if angle1 <= 90:
+                perimeter_points.append((x1, y1))
 
-            else:
-                joined_sections.extend(no_inter_sections[0])
+            if angle2 <= 90:
+                perimeter_points.append((x2, y2))
+
+            # x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+            # x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+
+            # cv2.line(map, (int(x0 * pix_size[0]), int(y0 * pix_size[1])), (x1, y1), (0, 0, 255), 1)
+            # cv2.line(map, (int(x0 * pix_size[0]), int(y0 * pix_size[1])), (x2, y2), (0, 0, 255), 1)
+
+        # Draw perimeter points
+        # for i in range(len(perimeter_points) - 1):
+        #     x1, y1 = perimeter_points[i]
+        #     x2, y2 = perimeter_points[i + 1]
+
+        #     x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+        #     x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+
+        #     cv2.line(map, (x1, y1), (x2, y2), (255, 165, 0), 1)
+        
+        # Find biggest radius of traingle circumcentre
+        x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
+        biggest_perimeter_points = None
+        biggest_perimeter = 0
+        for point1 in perimeter_points:
+            for point2 in perimeter_points:
+                if point1 == point2:
+                    continue
+                x1, y1 = point1
+                x1, y1 = x1 - x0, y1 - y0
+                x2, y2 = point2
+                x2, y2 = x2 - x0, y2 - y0
+
+                print(np.hypot(x1, y1), np.hypot(x2, y2), np.hypot(x1 - x2, y1 - y2))
+
+                perimeter = np.hypot(x1, y1) + np.hypot(x2, y2) + np.hypot(x1 - x2, y1 - y2)
+
+                if perimeter > biggest_perimeter:
+                    biggest_perimeter = perimeter
+                    biggest_perimeter_points = [point1, point2]
+
+                # Draw all the lines in perimeter
+                # x1, y1 = int((x1 + x0) * pix_size[0]), int((y1 + y0) * pix_size[1])
+                # x2, y2 = int((x2 + x0) * pix_size[0]), int((y2 + y0) * pix_size[1])
+
+                # cv2.line(map, (x1, y1), (x2, y2), (0, 0, 255), 1)
+
+        # Draw biggest perimeter points
+        for i in range(len(biggest_perimeter_points) - 1):
+            x1, y1 = biggest_perimeter_points[i]
+            x2, y2 = biggest_perimeter_points[i + 1]
+
+            x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
+            x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
+
+            cv2.line(map, (x1, y1), (x2, y2), (255, 165, 0), 1)
+
+
+        # # Join line sections
+        # joined_sections = []
+        # if len(no_inter_sections) > 1:
+        #     x1, y1 = no_inter_sections[1][0]
+        #     smallest_dist = np.inf
+        #     smallest_idx = len(no_inter_sections[0])
+        #     for j, point in enumerate(no_inter_sections[0]):
+        #         x2, y2 = point
+        #         dist = np.hypot(x1 - x2, y1 - y2)
+
+        #         if dist < smallest_dist:
+        #             smallest_dist = dist
+
+        #             if smallest_idx == 0:
+        #                 smallest_idx = 1
+        #             else:
+        #                 smallest_idx = j
+
+        #     # Check if path to joins is not going back
+        #     x1, y1 = no_inter_sections[0][smallest_idx]
+        #     x2, y2 = no_inter_sections[0][0]
+        #     x3, y3 = no_inter_sections[1][0]
+        #     x4, y4 = no_inter_sections[1][-1]
+
+        #     # cv2.line(map, (int(x1 * pix_size[0]), int(y1 * pix_size[1])), (int(x2 * pix_size[0]), int(y2 * pix_size[1])), (0, 0, 255))
+        #     # cv2.line(map, (int(x3 * pix_size[0]), int(y3 * pix_size[1])), (int(x4 * pix_size[0]), int(y4 * pix_size[1])), (0, 0, 255))
+
+        #     d12 = np.array([x2 - x1, y2 - y1])
+        #     d12 = d12 / np.linalg.norm(d12)
+        #     d34 = np.array([x3 - x4, y3 - y4])
+        #     d34 = d34 / np.linalg.norm(d34)
+
+        #     angle = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
+
+        #     print(angle)
+
+        #     if angle < 140:
+        #         joined_sections.extend(no_inter_sections[0][:smallest_idx])
+        #         joined_sections.extend(no_inter_sections[1])
+
+        #     else:
+        #         joined_sections.extend(no_inter_sections[0])
 
         # Smooth trajectory with Bezu curve
-        curve = np.array(bezier_curve(joined_sections, nTimes=100)).T
+        curve = np.array(bezier_curve(no_inter_sections[0], nTimes=100)).T
 
         for point in curve:
             x, y = point
