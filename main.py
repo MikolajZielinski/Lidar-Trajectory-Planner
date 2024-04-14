@@ -193,10 +193,10 @@ if __name__ == '__main__':
             angle1 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
             angle2 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d56), -1.0, 1.0)))
 
-            if angle1 <= 90:
+            if angle1 <= 70:
                 perimeter_points.append(((x1, y1), i))
 
-            if angle2 <= 90:
+            if angle2 <= 70:
                 perimeter_points.append(((x2, y2), i))
 
         if len(perimeter_points) == 0:
@@ -218,7 +218,7 @@ if __name__ == '__main__':
 
         #     cv2.line(map, (x1, y1), (x2, y2), (255, 165, 0), 1)
         
-        # Find biggest radius of traingle circumcentre
+        # Find biggest traingle
         x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
         biggest_perimeter_points = None
         biggest_perimeter = 0
@@ -258,11 +258,55 @@ if __name__ == '__main__':
 
             cv2.line(map, (x1, y1), (x2, y2), (255, 165, 0), 1)
 
-        # Join paths
+        # Choose closest path as first path
+        x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
         turn_right_sections = no_inter_sections[0]
+        for section in no_inter_sections:
+            smallest_dist = np.inf
+            for point in section:
+                x1, y1 = point
+                dist = np.hypot(x1 - x0, y1 - y0)
+
+                if dist < smallest_dist:
+                    smallest_dist = dist
+
+            if smallest_dist < 1.0:
+                turn_right_sections = section
+                break
+
+        # Join paths
         if biggest_perimeter_points[0][1] != 0:
             section_to_add = no_inter_sections[biggest_perimeter_points[0][1]]
-            turn_right_sections.extend(section_to_add)
+
+            x0, y0 = turn_right_sections[-1]
+            x1, y1 = section_to_add[0]
+            x2, y2 = section_to_add[-1]
+
+            if np.hypot(x1 - x0, y1 - y0) > np.hypot(x2 - x0, y2 - y0):
+                section_to_add.reverse()
+
+            smallest_dist = np.inf
+            smallest_idx2 = len(turn_right_sections)
+            smallest_idx2 = len(section_to_add)
+
+            for i, point1 in enumerate(turn_right_sections):
+                xp1, yp1 = point1
+
+                for j, point2 in enumerate(section_to_add):
+                    xp2, yp2 = point2
+                    dist = np.hypot(xp1 - xp2, yp1 - yp2)
+
+                    if dist < smallest_dist:
+                        smallest_dist = dist
+
+                        if smallest_idx2 == 0:
+                            smallest_idx2 = 1
+                        else:
+                            smallest_idx1 = i
+                            smallest_idx2 = j
+
+            turn_right_sections = turn_right_sections[:smallest_idx1]
+            turn_right_sections.extend(section_to_add[smallest_idx2:])
 
     
         # # Join line sections
