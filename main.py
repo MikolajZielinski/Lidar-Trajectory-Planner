@@ -194,10 +194,13 @@ if __name__ == '__main__':
             angle2 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d56), -1.0, 1.0)))
 
             if angle1 <= 90:
-                perimeter_points.append((x1, y1))
+                perimeter_points.append(((x1, y1), i))
 
             if angle2 <= 90:
-                perimeter_points.append((x2, y2))
+                perimeter_points.append(((x2, y2), i))
+
+        if len(perimeter_points) == 0:
+            perimeter_points.append((no_inter_sections[0][-1], 0))
 
             # x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
             # x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
@@ -219,40 +222,49 @@ if __name__ == '__main__':
         x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
         biggest_perimeter_points = None
         biggest_perimeter = 0
-        for point1 in perimeter_points:
-            for point2 in perimeter_points:
-                if point1 == point2:
-                    continue
-                x1, y1 = point1
-                x1, y1 = x1 - x0, y1 - y0
-                x2, y2 = point2
-                x2, y2 = x2 - x0, y2 - y0
+        if len(perimeter_points) > 1:
+            for point1 in perimeter_points:
+                for point2 in perimeter_points:
+                    if point1 == point2:
+                        continue
 
-                print(np.hypot(x1, y1), np.hypot(x2, y2), np.hypot(x1 - x2, y1 - y2))
+                    x1, y1 = point1[0]
+                    x1, y1 = x1 - x0, y1 - y0
+                    x2, y2 = point2[0]
+                    x2, y2 = x2 - x0, y2 - y0
 
-                perimeter = np.hypot(x1, y1) + np.hypot(x2, y2) + np.hypot(x1 - x2, y1 - y2)
+                    perimeter = np.hypot(x1, y1) + np.hypot(x2, y2) + np.hypot(x1 - x2, y1 - y2)
 
-                if perimeter > biggest_perimeter:
-                    biggest_perimeter = perimeter
-                    biggest_perimeter_points = [point1, point2]
+                    if perimeter > biggest_perimeter:
+                        biggest_perimeter = perimeter
+                        biggest_perimeter_points = [point1, point2]
 
-                # Draw all the lines in perimeter
-                # x1, y1 = int((x1 + x0) * pix_size[0]), int((y1 + y0) * pix_size[1])
-                # x2, y2 = int((x2 + x0) * pix_size[0]), int((y2 + y0) * pix_size[1])
+                    # Draw all the lines in perimeter
+                    # x1, y1 = int((x1 + x0) * pix_size[0]), int((y1 + y0) * pix_size[1])
+                    # x2, y2 = int((x2 + x0) * pix_size[0]), int((y2 + y0) * pix_size[1])
 
-                # cv2.line(map, (x1, y1), (x2, y2), (0, 0, 255), 1)
+                    # cv2.line(map, (x1, y1), (x2, y2), (0, 0, 255), 1)
+
+        else:
+            biggest_perimeter_points = perimeter_points
 
         # Draw biggest perimeter points
         for i in range(len(biggest_perimeter_points) - 1):
-            x1, y1 = biggest_perimeter_points[i]
-            x2, y2 = biggest_perimeter_points[i + 1]
+            x1, y1 = biggest_perimeter_points[i][0]
+            x2, y2 = biggest_perimeter_points[i + 1][0]
 
             x1, y1 = int(x1 * pix_size[0]), int(y1 * pix_size[1])
             x2, y2 = int(x2 * pix_size[0]), int(y2 * pix_size[1])
 
             cv2.line(map, (x1, y1), (x2, y2), (255, 165, 0), 1)
 
+        # Join paths
+        turn_right_sections = no_inter_sections[0]
+        if biggest_perimeter_points[0][1] != 0:
+            section_to_add = no_inter_sections[biggest_perimeter_points[0][1]]
+            turn_right_sections.extend(section_to_add)
 
+    
         # # Join line sections
         # joined_sections = []
         # if len(no_inter_sections) > 1:
@@ -295,9 +307,9 @@ if __name__ == '__main__':
 
         #     else:
         #         joined_sections.extend(no_inter_sections[0])
-
+    
         # Smooth trajectory with Bezu curve
-        curve = np.array(bezier_curve(no_inter_sections[0], nTimes=100)).T
+        curve = np.array(bezier_curve(turn_right_sections, nTimes=100)).T
 
         for point in curve:
             x, y = point
