@@ -30,6 +30,8 @@ if __name__ == '__main__':
     # Start conditions
     start_point = np.array([250 * scale, 255 * scale])
     start_angle = -np.pi / 2
+    # start_point = np.array([500 * scale, 46 * scale])
+    # start_angle = np.pi / 1.5
     step = 0.1
     angle_step = np.pi / 18
 
@@ -193,10 +195,10 @@ if __name__ == '__main__':
             angle1 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
             angle2 = np.rad2deg(np.arccos(np.clip(np.dot(d12, d56), -1.0, 1.0)))
 
-            if angle1 <= 70:
+            if angle1 <= 110:
                 perimeter_points.append(((x1, y1), i))
 
-            if angle2 <= 70:
+            if angle2 <= 110:
                 perimeter_points.append(((x2, y2), i))
 
         if len(perimeter_points) == 0:
@@ -274,15 +276,11 @@ if __name__ == '__main__':
                 turn_right_sections = section
                 break
 
-        # Join paths
+        # Turn right path
         if biggest_perimeter_points[0][1] != 0:
             section_to_add = no_inter_sections[biggest_perimeter_points[0][1]]
-
-            x0, y0 = turn_right_sections[-1]
-            x1, y1 = section_to_add[0]
-            x2, y2 = section_to_add[-1]
-
-            if np.hypot(x1 - x0, y1 - y0) > np.hypot(x2 - x0, y2 - y0):
+            
+            if biggest_perimeter_points[0][0] == section_to_add[0]:
                 section_to_add.reverse()
 
             smallest_dist = np.inf
@@ -308,51 +306,7 @@ if __name__ == '__main__':
             turn_right_sections = turn_right_sections[:smallest_idx1]
             turn_right_sections.extend(section_to_add[smallest_idx2:])
 
-    
-        # # Join line sections
-        # joined_sections = []
-        # if len(no_inter_sections) > 1:
-        #     x1, y1 = no_inter_sections[1][0]
-        #     smallest_dist = np.inf
-        #     smallest_idx = len(no_inter_sections[0])
-        #     for j, point in enumerate(no_inter_sections[0]):
-        #         x2, y2 = point
-        #         dist = np.hypot(x1 - x2, y1 - y2)
-
-        #         if dist < smallest_dist:
-        #             smallest_dist = dist
-
-        #             if smallest_idx == 0:
-        #                 smallest_idx = 1
-        #             else:
-        #                 smallest_idx = j
-
-        #     # Check if path to joins is not going back
-        #     x1, y1 = no_inter_sections[0][smallest_idx]
-        #     x2, y2 = no_inter_sections[0][0]
-        #     x3, y3 = no_inter_sections[1][0]
-        #     x4, y4 = no_inter_sections[1][-1]
-
-        #     # cv2.line(map, (int(x1 * pix_size[0]), int(y1 * pix_size[1])), (int(x2 * pix_size[0]), int(y2 * pix_size[1])), (0, 0, 255))
-        #     # cv2.line(map, (int(x3 * pix_size[0]), int(y3 * pix_size[1])), (int(x4 * pix_size[0]), int(y4 * pix_size[1])), (0, 0, 255))
-
-        #     d12 = np.array([x2 - x1, y2 - y1])
-        #     d12 = d12 / np.linalg.norm(d12)
-        #     d34 = np.array([x3 - x4, y3 - y4])
-        #     d34 = d34 / np.linalg.norm(d34)
-
-        #     angle = np.rad2deg(np.arccos(np.clip(np.dot(d12, d34), -1.0, 1.0)))
-
-        #     print(angle)
-
-        #     if angle < 140:
-        #         joined_sections.extend(no_inter_sections[0][:smallest_idx])
-        #         joined_sections.extend(no_inter_sections[1])
-
-        #     else:
-        #         joined_sections.extend(no_inter_sections[0])
-    
-        # Smooth trajectory with Bezu curve
+        # Smooth trajectory with Bezier curve
         curve = np.array(bezier_curve(turn_right_sections, nTimes=100)).T
 
         for point in curve:
@@ -360,6 +314,71 @@ if __name__ == '__main__':
             x, y = int(x * pix_size[0]), int(y * pix_size[1])
 
             cv2.rectangle(map, (x, y), (x, y), (255, 0, 255))
+
+        # Reverse all sections
+        if len(biggest_perimeter_points) > 0:
+            if len(no_inter_sections) > biggest_perimeter_points[1][1]:
+                section_turn_left = no_inter_sections[biggest_perimeter_points[1][1]]
+        for section in no_inter_sections:
+            section.reverse()
+
+        no_inter_sections.reverse()
+
+        # Choose closest path as first path
+        x0, y0 = (start_point[0] / pix_size[0]),  (start_point[1] / pix_size[1])
+        turn_left_sections = no_inter_sections[-1]
+        
+        for section in no_inter_sections:
+            smallest_dist = np.inf
+            for point in section:
+                x1, y1 = point
+                dist = np.hypot(x1 - x0, y1 - y0)
+
+                if dist < smallest_dist:
+                    smallest_dist = dist
+
+            if smallest_dist < 1.0:
+                turn_left_sections = section
+                break
+
+        # Turn left path
+        if biggest_perimeter_points[1][1] != len(no_inter_sections) - 1:
+            section_to_add = section_turn_left
+            
+            if biggest_perimeter_points[1][0] == section_to_add[0]:
+                section_to_add.reverse()
+
+            smallest_dist = np.inf
+            smallest_idx2 = len(turn_left_sections)
+            smallest_idx2 = len(section_to_add)
+
+            for i, point1 in enumerate(turn_left_sections):
+                xp1, yp1 = point1
+
+                for j, point2 in enumerate(section_to_add):
+                    xp2, yp2 = point2
+                    dist = np.hypot(xp1 - xp2, yp1 - yp2)
+
+                    if dist < smallest_dist:
+                        smallest_dist = dist
+
+                        if smallest_idx2 == 0:
+                            smallest_idx2 = 1
+                        else:
+                            smallest_idx1 = i
+                            smallest_idx2 = j
+
+            turn_left_sections = turn_left_sections[:smallest_idx1]
+            turn_left_sections.extend(section_to_add[smallest_idx2:])
+
+        # Smooth trajectory with Bezier curve
+        curve = np.array(bezier_curve(turn_left_sections, nTimes=100)).T
+
+        for point in curve:
+            x, y = point
+            x, y = int(x * pix_size[0]), int(y * pix_size[1])
+
+            cv2.rectangle(map, (x, y), (x, y), (255, 165, 0))
 
         # print(a)
 
