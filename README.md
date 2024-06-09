@@ -12,7 +12,7 @@ Simply run
 python3 main.py
 ```
 
-THe window should pop up
+The window should pop up
 
 ![Example map](images/demo_map.png)
 
