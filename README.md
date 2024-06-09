@@ -1,6 +1,6 @@
 # Lidar Trajectory Planner
 
-This is repository with my solution for planning trajectory for f1teenth bolid with lidar data. This is very simplified environment only for testing concepts and visualization.
+This is repository with my solution for planning trajectory for f1teenth bolid with lidar data. This is very simplified environment. Only for testing concepts and visualization.
 
 Maps and datapath are taken from [Autoware](https://github.com/autowarefoundation/autoware)
 
