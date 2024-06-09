@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 import cv2
 
-from lidar import Lidar
-from bezier import bezier_curve
+from src.lidar import Lidar
+from src.bezier import bezier_curve
 
 
 if __name__ == '__main__':
 
     # Load map file
-    map = cv2.imread('/home/mikolaj/autoware_map/race_track_01/map.pgm')
+    map = cv2.imread('data/map.pgm')
     h, w, c = map.shape
     scale = 3
     map = cv2.resize(map, (w * scale, h * scale))
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     map_oryg = np.copy(map)
     
     # Load reference trajectory
-    ref_traj = pd.read_csv('/home/mikolaj/autoware_map/race_track_01/trajectory.csv', sep='; ')
+    ref_traj = pd.read_csv('data/trajectory.csv', sep='; ')
     ref_traj = ref_traj[['x_m', 'y_m']]
 
     # Offset variables to match reference trajectory with map
@@ -143,7 +143,7 @@ if __name__ == '__main__':
                 cv2.line(map, (x1, y1), (n_x + x1, n_y + y1), (0, 255, 0), 1)
 
             normal_vectors_sections.append(normal_vectors_subsections)
-                
+
         # Check if normal vectors are intersecting each other and remove them
         no_inter_sections = []
         for line_sub_red, norm_sub in zip(line_sections_reduced, normal_vectors_sections):
@@ -249,7 +249,7 @@ if __name__ == '__main__':
 
         else:
             biggest_perimeter_points = perimeter_points
-
+                
         # Draw biggest perimeter points
         for i in range(len(biggest_perimeter_points) - 1):
             x1, y1 = biggest_perimeter_points[i][0]
@@ -284,7 +284,7 @@ if __name__ == '__main__':
                 section_to_add.reverse()
 
             smallest_dist = np.inf
-            smallest_idx2 = len(turn_right_sections)
+            smallest_idx1 = len(turn_right_sections)
             smallest_idx2 = len(section_to_add)
 
             for i, point1 in enumerate(turn_right_sections):
@@ -317,8 +317,8 @@ if __name__ == '__main__':
 
         # Reverse all sections
         if len(biggest_perimeter_points) > 0:
-            if len(no_inter_sections) > biggest_perimeter_points[1][1]:
-                section_turn_left = no_inter_sections[biggest_perimeter_points[1][1]]
+            if len(no_inter_sections) > biggest_perimeter_points[-1][1]:
+                section_turn_left = no_inter_sections[biggest_perimeter_points[-1][1]]
         for section in no_inter_sections:
             section.reverse()
 
@@ -342,14 +342,14 @@ if __name__ == '__main__':
                 break
 
         # Turn left path
-        if biggest_perimeter_points[1][1] != len(no_inter_sections) - 1:
+        if biggest_perimeter_points[-1][1] != len(no_inter_sections) - 1:
             section_to_add = section_turn_left
             
-            if biggest_perimeter_points[1][0] == section_to_add[0]:
+            if biggest_perimeter_points[-1][0] == section_to_add[0]:
                 section_to_add.reverse()
 
             smallest_dist = np.inf
-            smallest_idx2 = len(turn_left_sections)
+            smallest_idx1 = len(turn_left_sections)
             smallest_idx2 = len(section_to_add)
 
             for i, point1 in enumerate(turn_left_sections):

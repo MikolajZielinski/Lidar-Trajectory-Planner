@@ -1,3 +1,8 @@
+"""
+This part of code was taken from:
+https://stackoverflow.com/questions/12643079/b%C3%A9zier-curve-fitting-with-scipy
+"""
+
 import numpy as np
 from scipy.special import comb
 
